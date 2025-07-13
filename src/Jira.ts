@@ -82,6 +82,64 @@ const getYoMommaJoke = server.tool(
   }
 );
 
+// ========== JIRA ISSUE RETRIEVAL TOOL ==========
+
+const JIRA_DOMAIN = process.env.JIRA_DOMAIN!;
+const JIRA_EMAIL = process.env.JIRA_EMAIL!;
+const JIRA_API_TOKEN = process.env.JIRA_API_TOKEN!;
+const JIRA_AUTH = Buffer.from(`${JIRA_EMAIL}:${JIRA_API_TOKEN}`).toString("base64");
+
+const getJiraIssues = server.tool(
+  "get-jira-issues",
+  "Retrieve Jira issues using filters like project, status, summary, label, assignee, or issueType",
+  {
+    project: z.string().describe("Jira project key (e.g., MCP)"),
+    status: z.string().optional().describe("Issue status (e.g., Done, In Progress)"),
+    summary: z.string().optional().describe("Text to match in summary"),
+    label: z.string().optional().describe("Label to filter issues by (e.g., bug, urgent)"),
+    assignee: z.string().optional().describe("User the issue is assigned to"),
+    issueType: z.string().optional().describe("Type of issue (e.g., Task, Epic, Bug)"),
+    limit: z.number().optional().describe("Max number of issues to retrieve"),
+  },
+  async ({ project, status, summary, label, assignee, issueType, limit }) => {
+    const jqlParts = [];
+
+    jqlParts.push(`project=${project}`);
+    if (status) jqlParts.push(`status="${status}"`);
+    if (summary) jqlParts.push(`summary~"${summary}"`);
+    if (label) jqlParts.push(`labels="${label}"`);
+    if (assignee) jqlParts.push(`assignee="${assignee}"`);
+    if (issueType) jqlParts.push(`issuetype="${issueType}"`);
+
+    const jql = jqlParts.join(" AND ");
+    const maxResults = limit ?? 5;
+
+    const url = `https://${JIRA_DOMAIN}/rest/api/3/search?jql=${encodeURIComponent(jql)}&maxResults=${maxResults}`;
+
+    const response = await fetch(url, {
+      headers: {
+        Accept: "application/json",
+        Authorization: `Basic ${JIRA_AUTH}`,
+        "User-Agent": "mcp-jira-agent/1.0",
+
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Jira error: ${await response.text()}`);
+    }
+
+    const data = await response.json();
+    const issues = data.issues.map((i: any) => `#${i.key}: ${i.fields.summary} [${i.fields.status.name}]`).join("\n");
+
+    return {
+      content: [{ type: "text", text: issues || "No matching issues found." }],
+    };
+  }
+);
+
+
+
 // ========== SERVICENOW INCIDENT TOOL ==========
 
 const SN_INSTANCE = process.env.SN_INSTANCE!;
