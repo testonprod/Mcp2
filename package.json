@@ -1,12 +1,16 @@
 {
   "name": "mcp2",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "main": "dist/Jira.js",
+  "type": "commonjs",
   "scripts": {
-    "start": "ts-node src/Jira.ts",
+    "build": "tsc",
+    "start": "node dist/Jira.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "files": [
+    "build"
+  ],
   "keywords": [],
   "author": "",
   "license": "ISC",
